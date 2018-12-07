@@ -318,6 +318,12 @@ function resolveAsGetter(
   injection: Readonly<Injection>,
   session?: ResolutionSession,
 ) {
+  const targetType = inspectTargetType(injection);
+  if (targetType && targetType !== Function) {
+    throw new Error(
+      `The target type ${targetType.name} is not a Getter function`,
+    );
+  }
   // We need to clone the session for the getter as it will be resolved later
   session = ResolutionSession.fork(session);
   return function getter() {
@@ -329,6 +335,12 @@ function resolveAsGetter(
 }
 
 function resolveAsSetter(ctx: Context, injection: Injection) {
+  const targetType = inspectTargetType(injection);
+  if (targetType && targetType !== Function) {
+    throw new Error(
+      `The target type ${targetType.name} is not a Setter function`,
+    );
+  }
   // No resolution session should be propagated into the setter
   return function setter(value: BoundValue) {
     ctx.bind(injection.bindingKey).to(value);
