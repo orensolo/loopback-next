@@ -229,3 +229,101 @@ class HelloController {
 These "sugar" decorators allow you to quickly build up your application without
 having to code up all the additional logic by simply giving LoopBack hints (in
 the form of metadata) to your intent.
+
+## Context watcher
+
+Bindings in a context can come and go. It's often desirable for an artifact
+(especially an extension point) to keep track of other artifacts (extensions).
+For example, the `RestServer` needs to know routes contributed by `controller`
+classes. Ideally, a controller can be added context even after the application
+starts.
+
+To support the dynamic tracking of such artifacts registered within a context
+chain, we introduce the `ContextWatcher` class that can be used to watch a list
+of bindings matching certain criteria depicted by a `BindingFilter` function.
+
+```ts
+import {Context, ContextWatcher} from '@loopback/context';
+
+// Set up a context chain
+const appCtx = new Context('app');
+const serverCtx = new Context(appCtx, 'server'); // server -> app
+
+// Define a binding filter to select bindings with tag `controller`
+const controllerFilter = binding => binding.tagMap.controller != null;
+
+// Watch for bindings with tag `controller`
+const watcher = serverCtx.watch(controllerFilter);
+
+// No controllers yet
+await watcher.values(); => []
+
+// Bind Controller1 to server context
+serverCtx
+  .bind('controllers.Controller1')
+  .toClass(Controller1)
+  .tag('controller');
+
+// Resolve to an instance of Controller1
+await watcher.values(); // => [an instance of Controller1];
+
+// Bind Controller2 to app context
+appCtx
+  .bind('controllers.Controller2')
+  .toClass(Controller2)
+  .tag('controller');
+
+// Resolve to an instance of Controller1 and an instance of Controller2
+await watcher.values(); // => [an instance of Controller1, an instance of Controller2];
+
+// Unbind Controller2
+appCtx.unbind('controllers.Controller2');
+
+// No more instance of Controller2
+await watcher.values(); // => [an instance of Controller1];
+```
+
+If your dependency needs to follow the context for values from bindings matching
+a filter, use `@inject.filter` for dependency injection.
+
+```ts
+import {inject, Getter} from '@loopback/context';
+import {DataSource} from '@loopback/repository';
+
+export class DataSourceTracker {
+  constructor(
+    // The target type is `Getter` function
+    @inject.filter({tags: ['datasource']})
+    private dataSources: Getter<DataSource[]>,
+  ) {}
+
+  async listDataSources(): Promise<DataSource[]> {
+    // Use the Getter function to resolve data source instances
+    return await this.dataSources();
+  }
+}
+```
+
+The `@inject.filter` decorator can take a `BindingFilter` function in addition
+to `BindingScopeAndTags`. And it can be applied to properties too. For example:
+
+```ts
+export class DataSourceTracker {
+  // The target type is `ContextWatcher`
+  @inject.filter(binding => binding.tagMap['datasource'] != null)
+  private dataSources: ContextWatcher<DataSource>;
+
+  async listDataSources(): Promise<DataSource[]> {
+    // Use the Getter function to resolve data source instances
+    return await this.dataSources.values();
+  }
+
+  // ...
+}
+```
+
+The resolved value from `@inject.filter` injection varies on the target type:
+
+- Function -> a Getter function
+- ContextWatcher -> An instance of ContextWatcher
+- other -> An array of values resolved from the current state of the context
