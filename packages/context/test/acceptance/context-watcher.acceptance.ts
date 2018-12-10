@@ -1,30 +1,38 @@
 import {expect} from '@loopback/testlab';
-import {Context, ContextWatcher, Getter, inject} from '../..';
+import {
+  Context,
+  ContextWatcher,
+  ContextListener,
+  Getter,
+  inject,
+  ContextEventType,
+  Binding,
+} from '../..';
 
 describe('ContextWatcher - watches matching bindings', () => {
-  let ctx: Context;
+  let server: Context;
   let contextWatcher: ContextWatcher;
-  beforeEach(givenContextWatcher);
+  beforeEach(givenControllerWatcher);
 
   it('watches matching bindings', async () => {
     // We have ctx: 1, parent: 2
     expect(await getControllers()).to.eql(['1', '2']);
-    ctx.unbind('controllers.1');
+    server.unbind('controllers.1');
     // Now we have parent: 2
     expect(await getControllers()).to.eql(['2']);
-    ctx.parent!.unbind('controllers.2');
+    server.parent!.unbind('controllers.2');
     // All controllers are gone from the context chain
     expect(await getControllers()).to.eql([]);
     // Add a new controller - ctx: 3
-    givenController(ctx, '3');
+    givenController(server, '3');
     expect(await getControllers()).to.eql(['3']);
   });
 
-  function givenContextWatcher() {
-    ctx = givenContext();
-    contextWatcher = ctx.watch(Context.bindingTagFilter('controller'));
-    givenController(ctx, '1');
-    givenController(ctx.parent!, '2');
+  function givenControllerWatcher() {
+    server = givenServerWithinAnApp();
+    contextWatcher = server.watch(Context.bindingTagFilter('controller'));
+    givenController(server, '1');
+    givenController(server.parent!, '2');
   }
 
   function givenController(_ctx: Context, _name: string) {
@@ -96,7 +104,7 @@ describe('@inject.filter - injects a live collection of matching bindings', asyn
   });
 
   function givenPrimeNumbers() {
-    ctx = givenContext();
+    ctx = givenServerWithinAnApp();
     givenPrime(ctx, 3);
     givenPrime(ctx.parent!, 5);
   }
@@ -109,7 +117,65 @@ describe('@inject.filter - injects a live collection of matching bindings', asyn
   }
 });
 
-function givenContext() {
+describe('ContextListener - listens on matching bindings', () => {
+  let server: Context;
+  let contextListener: MyListenerForControllers;
+  beforeEach(givenControllerListener);
+
+  it('receives notifications of matching binding events', async () => {
+    // We have ctx: 1, parent: 2
+    expect(await getControllers()).to.eql(['1', '2']);
+    server.unbind('controllers.1');
+    // Now we have parent: 2
+    expect(await getControllers()).to.eql(['2']);
+    server.parent!.unbind('controllers.2');
+    // All controllers are gone from the context chain
+    expect(await getControllers()).to.eql([]);
+    // Add a new controller - ctx: 3
+    givenController(server, '3');
+    expect(await getControllers()).to.eql(['3']);
+  });
+
+  class MyListenerForControllers implements ContextListener {
+    controllers: Set<string> = new Set();
+    filter = Context.bindingTagFilter('controller');
+    listen(event: ContextEventType, binding: Readonly<Binding<unknown>>) {
+      if (event === ContextEventType.bind) {
+        this.controllers.add(binding.tagMap.name);
+      } else if (event === ContextEventType.unbind) {
+        this.controllers.delete(binding.tagMap.name);
+      }
+    }
+  }
+
+  function givenControllerListener() {
+    server = givenServerWithinAnApp();
+    contextListener = new MyListenerForControllers();
+    server.subscribe(contextListener);
+    givenController(server, '1');
+    givenController(server.parent!, '2');
+    return contextListener;
+  }
+
+  function givenController(_ctx: Context, _name: string) {
+    class MyController {
+      name = _name;
+    }
+    _ctx
+      .bind(`controllers.${_name}`)
+      .toClass(MyController)
+      .tag('controller', {name: _name});
+  }
+
+  async function getControllers() {
+    return new Promise<string[]>(resolve => {
+      // Wrap it inside `setImmediate` to make the events are triggered
+      setImmediate(() => resolve(Array.from(contextListener.controllers)));
+    });
+  }
+});
+
+function givenServerWithinAnApp() {
   const parent = new Context('app');
   const ctx = new Context(parent, 'server');
   return ctx;

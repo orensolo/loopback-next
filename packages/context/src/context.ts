@@ -8,7 +8,7 @@ import {v1 as uuidv1} from 'uuid';
 import {ValueOrPromise} from '.';
 import {Binding, BindingTag, TagMap} from './binding';
 import {BindingAddress, BindingKey} from './binding-key';
-import {ContextWatcher} from './context-watcher';
+import {ContextWatcher, ContextListener} from './context-watcher';
 import {ResolutionOptions, ResolutionSession} from './resolution-session';
 import {BoundValue, getDeepProperty, isPromiseLike} from './value-promise';
 
@@ -48,9 +48,9 @@ export class Context {
   protected _parent?: Context;
 
   /**
-   * A list of registered context watchers
+   * A list of registered context listeners
    */
-  protected watchers: Set<ContextWatcher> = new Set();
+  protected listeners: Set<ContextListener> = new Set();
 
   /**
    * Create a new context. For example,
@@ -117,9 +117,9 @@ export class Context {
     this.registry.set(key, binding);
     if (existingBinding !== binding) {
       if (existingBinding != null) {
-        this.notifyWatchers(ContextEventType.unbind, existingBinding);
+        this.notifyListeners(ContextEventType.unbind, existingBinding);
       }
-      this.notifyWatchers(ContextEventType.bind, binding);
+      this.notifyListeners(ContextEventType.bind, binding);
     }
     return this;
   }
@@ -141,31 +141,31 @@ export class Context {
     if (binding && binding.isLocked)
       throw new Error(`Cannot unbind key "${key}" of a locked binding`);
     const found = this.registry.delete(key);
-    this.notifyWatchers(ContextEventType.unbind, binding);
+    this.notifyListeners(ContextEventType.unbind, binding);
     return found;
   }
 
   /**
-   * Add the context watcher as an event listener to the context chain,
+   * Add the context listener as an event listener to the context chain,
    * including its ancestors
-   * @param watcher Context watcher
+   * @param listener Context listener
    */
-  subscribe(watcher: ContextWatcher) {
+  subscribe(listener: ContextListener) {
     let ctx: Context | undefined = this;
     while (ctx != null) {
-      ctx.watchers.add(watcher);
+      ctx.listeners.add(listener);
       ctx = ctx._parent;
     }
   }
 
   /**
-   * Remove the context watcher  from the context chain
-   * @param watcher Context watcher
+   * Remove the context listener  from the context chain
+   * @param listener Context listener
    */
-  unsubscribe(watcher: ContextWatcher) {
+  unsubscribe(listener: ContextListener) {
     let ctx: Context | undefined = this;
     while (ctx != null) {
-      ctx.watchers.delete(watcher);
+      ctx.listeners.delete(listener);
       ctx = ctx._parent;
     }
   }
@@ -174,33 +174,33 @@ export class Context {
    * Watch the context chain with the given binding filter
    * @param filter A function to match bindings
    */
-  watch(filter: BindingFilter) {
-    const watcher = new ContextWatcher(this, filter);
-    this.subscribe(watcher);
-    return watcher;
+  watch<T = unknown>(filter: BindingFilter) {
+    const listener = new ContextWatcher<T>(this, filter);
+    this.subscribe(listener);
+    return listener;
   }
 
   /**
-   * Publish an event to the registered watchers. Please note the
+   * Publish an event to the registered listeners. Please note the
    * notification happens using `process.nextTick` so that we allow fluent APIs
-   * such as `ctx.bind('key').to(...).tag(...);` and give watchers the fully
+   * such as `ctx.bind('key').to(...).tag(...);` and give listeners the fully
    * populated binding
    *
    * @param event Event names: `bind` or `unbind`
    * @param binding Binding bound or unbound
    */
-  protected notifyWatchers(
+  protected notifyListeners(
     event: ContextEventType,
     binding: Readonly<Binding<unknown>>,
   ) {
-    // Notify watchers in the next tick
-    process.nextTick(() => {
-      for (const watcher of this.watchers) {
-        if (watcher.filter(binding)) {
+    // Notify listeners in the next tick
+    process.nextTick(async () => {
+      for (const listener of this.listeners) {
+        if (listener.filter(binding)) {
           try {
-            watcher.listen(event, binding);
+            await listener.listen(event, binding);
           } catch (err) {
-            debug('Error thrown by a watcher is ignored', err, event, binding);
+            debug('Error thrown by a listener is ignored', err, event, binding);
             // Ignore the error
           }
         }

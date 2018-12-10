@@ -12,6 +12,22 @@ import * as debugFactory from 'debug';
 const debug = debugFactory('loopback:context:watcher');
 
 /**
+ * Listeners of context bind/unbind events
+ */
+export interface ContextListener {
+  /**
+   * A filter function to match bindings
+   */
+  filter: BindingFilter;
+  /**
+   * Listen on `bind` or `unbind` and invalidate the cache
+   */
+  listen(
+    event: ContextEventType,
+    binding: Readonly<Binding<unknown>>,
+  ): ValueOrPromise<void>;
+}
+/**
  * Watching a given context chain to maintain a live list of matching bindings
  * and their resolved values within the context hierarchy.
  *
@@ -20,9 +36,9 @@ const debug = debugFactory('loopback:context:watcher');
  * they are added/removed/updated after the application starts.
  *
  */
-export class ContextWatcher<T = unknown> {
+export class ContextWatcher<T = unknown> implements ContextListener {
   protected _cachedBindings: Readonly<Binding<T>>[] | undefined;
-  protected _cachedValues: ValueOrPromise<T[]> | undefined;
+  protected _cachedValues: T[] | undefined;
 
   constructor(
     protected readonly ctx: Context,
@@ -88,26 +104,25 @@ export class ContextWatcher<T = unknown> {
    */
   resolve(session?: ResolutionSession) {
     debug('Resolving values');
-    this._cachedValues = resolveList(this.bindings, b => {
+    return resolveList(this.bindings, b => {
       return b.getValue(this.ctx, ResolutionSession.fork(session));
     });
-    return this._cachedValues;
   }
 
   /**
-   * Get the list of resolved values. If they are not cached, it tries tp find
+   * Get the list of resolved values. If they are not cached, it tries to find
    * and resolve them.
    */
-  values(): Promise<T[]> {
+  async values(): Promise<T[]> {
     debug('Reading values');
     // [REVIEW] We need to get values in the next tick so that it can pick up
     // binding changes as `Context` publishes such events in `process.nextTick`
     return new Promise<T[]>(resolve => {
       process.nextTick(async () => {
         if (this._cachedValues == null) {
-          this._cachedValues = this.resolve();
+          this._cachedValues = await this.resolve();
         }
-        resolve(await this._cachedValues);
+        resolve(this._cachedValues);
       });
     });
   }

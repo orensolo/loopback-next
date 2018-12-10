@@ -235,12 +235,16 @@ the form of metadata) to your intent.
 Bindings in a context can come and go. It's often desirable for an artifact
 (especially an extension point) to keep track of other artifacts (extensions).
 For example, the `RestServer` needs to know routes contributed by `controller`
-classes. Ideally, a controller can be added context even after the application
-starts.
+classes or other handlers. Such routes can be added or removed after the
+`RestServer` starts. For example, a controller can be added even after the
+application starts and it causes a new route to be bound into the application
+context. Ideally, the `RestServer` should be able to pick the new route without
+restarting.
 
 To support the dynamic tracking of such artifacts registered within a context
-chain, we introduce the `ContextWatcher` class that can be used to watch a list
-of bindings matching certain criteria depicted by a `BindingFilter` function.
+chain, we introduce `ContextListener` interface and `ContextWatcher` class that
+can be used to watch a list of bindings matching certain criteria depicted by a
+`BindingFilter` function.
 
 ```ts
 import {Context, ContextWatcher} from '@loopback/context';
@@ -256,7 +260,7 @@ const controllerFilter = binding => binding.tagMap.controller != null;
 const watcher = serverCtx.watch(controllerFilter);
 
 // No controllers yet
-await watcher.values(); => []
+await watcher.values(); // returns []
 
 // Bind Controller1 to server context
 serverCtx
@@ -265,7 +269,7 @@ serverCtx
   .tag('controller');
 
 // Resolve to an instance of Controller1
-await watcher.values(); // => [an instance of Controller1];
+await watcher.values(); // returns [an instance of Controller1];
 
 // Bind Controller2 to app context
 appCtx
@@ -274,14 +278,25 @@ appCtx
   .tag('controller');
 
 // Resolve to an instance of Controller1 and an instance of Controller2
-await watcher.values(); // => [an instance of Controller1, an instance of Controller2];
+await watcher.values(); // returns [an instance of Controller1, an instance of Controller2];
 
 // Unbind Controller2
 appCtx.unbind('controllers.Controller2');
 
 // No more instance of Controller2
-await watcher.values(); // => [an instance of Controller1];
+await watcher.values(); // returns [an instance of Controller1];
 ```
+
+The key benefit of `ContextWatcher` is that it caches resolved values until
+context bindings matching the filter function are added/removed. For most cases,
+we don't have to pay the penalty to find/resolve per request.
+
+To fully leverage the live list of extensions, an extension point such as
+`RoutingTable` should either keep a pointer to an instance of `ContextWatcher`
+corresponding to all `routes` (extensions) in the context chain and use the
+`values()` function to match again the live `routes` per request or implement
+itself as a `ContextListener` to rebuild the routes upon changes of routes in
+the context with `listen()`.
 
 If your dependency needs to follow the context for values from bindings matching
 a filter, use `@inject.filter` for dependency injection.
@@ -321,6 +336,14 @@ export class DataSourceTracker {
   // ...
 }
 ```
+
+Please note that `@inject.filter` has two flavors:
+
+- inject a snapshot of values from matching bindings without watching the
+  context. This is the behavior if the target type is an array instead of Getter
+  or ContextWatcher.
+- inject a Getter/ContextWatcher so that it keeps track of context binding
+  changes.
 
 The resolved value from `@inject.filter` injection varies on the target type:
 
