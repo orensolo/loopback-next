@@ -8,25 +8,17 @@ import {v1 as uuidv1} from 'uuid';
 import {ValueOrPromise} from '.';
 import {Binding, BindingTag, TagMap} from './binding';
 import {BindingAddress, BindingKey} from './binding-key';
-import {ContextWatcher, ContextListener} from './context-watcher';
+import {
+  BindingFilter,
+  ContextEventType,
+  ContextListener,
+  Subscription,
+} from './context-listener';
+import {ContextWatcher} from './context-watcher';
 import {ResolutionOptions, ResolutionSession} from './resolution-session';
 import {BoundValue, getDeepProperty, isPromiseLike} from './value-promise';
 
 const debug = debugModule('loopback:context');
-
-/**
- * Context event types
- */
-export enum ContextEventType {
-  bind = 'bind',
-  unbind = 'unbind',
-}
-
-/**
- * A function that filters bindings. It returns `true` to select a given
- * binding.
- */
-export type BindingFilter = (binding: Readonly<Binding<unknown>>) => boolean;
 
 /**
  * Context provides an implementation of Inversion of Control (IoC) container
@@ -50,7 +42,7 @@ export class Context {
   /**
    * A list of registered context listeners
    */
-  protected listeners: Set<ContextListener> = new Set();
+  public readonly listeners: Set<ContextListener> = new Set();
 
   /**
    * Create a new context. For example,
@@ -150,12 +142,13 @@ export class Context {
    * including its ancestors
    * @param listener Context listener
    */
-  subscribe(listener: ContextListener) {
+  subscribe(listener: ContextListener): Subscription {
     let ctx: Context | undefined = this;
     while (ctx != null) {
       ctx.listeners.add(listener);
       ctx = ctx._parent;
     }
+    return new ContextSubscription(this, listener);
   }
 
   /**
@@ -175,9 +168,9 @@ export class Context {
    * @param filter A function to match bindings
    */
   watch<T = unknown>(filter: BindingFilter) {
-    const listener = new ContextWatcher<T>(this, filter);
-    this.subscribe(listener);
-    return listener;
+    const watcher = new ContextWatcher<T>(this, filter);
+    watcher.watch();
+    return watcher;
   }
 
   /**
@@ -624,4 +617,22 @@ function wildcardToRegExp(pattern: string): RegExp {
   // `?` matches one character except `.` and `:`
   regexp = regexp.replace(/\*/g, '[^.:]*').replace(/\?/g, '[^.:]');
   return new RegExp(`^${regexp}$`);
+}
+
+/**
+ * An implementation of `Subscription` interface for context events
+ */
+class ContextSubscription implements Subscription {
+  constructor(protected ctx: Context, protected listener: ContextListener) {}
+
+  private _closed = false;
+
+  unsubscribe() {
+    this.ctx.unsubscribe(this.listener);
+    this._closed = true;
+  }
+
+  get closed() {
+    return this._closed;
+  }
 }

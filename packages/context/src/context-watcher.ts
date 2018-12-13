@@ -3,30 +3,20 @@
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
-import {Context, BindingFilter, ContextEventType} from './context';
-import {Binding} from './binding';
-import {ResolutionSession} from './resolution-session';
-import {resolveList, ValueOrPromise} from './value-promise';
-import {Getter} from './inject';
 import * as debugFactory from 'debug';
+import {Binding} from './binding';
+import {Context} from './context';
+import {
+  BindingFilter,
+  ContextEventType,
+  ContextListener,
+  Subscription,
+} from './context-listener';
+import {Getter} from './inject';
+import {ResolutionSession} from './resolution-session';
+import {resolveList} from './value-promise';
 const debug = debugFactory('loopback:context:watcher');
 
-/**
- * Listeners of context bind/unbind events
- */
-export interface ContextListener {
-  /**
-   * A filter function to match bindings
-   */
-  filter: BindingFilter;
-  /**
-   * Listen on `bind` or `unbind` and invalidate the cache
-   */
-  listen(
-    event: ContextEventType,
-    binding: Readonly<Binding<unknown>>,
-  ): ValueOrPromise<void>;
-}
 /**
  * Watching a given context chain to maintain a live list of matching bindings
  * and their resolved values within the context hierarchy.
@@ -39,6 +29,7 @@ export interface ContextListener {
 export class ContextWatcher<T = unknown> implements ContextListener {
   protected _cachedBindings: Readonly<Binding<T>>[] | undefined;
   protected _cachedValues: T[] | undefined;
+  private _subscription: Subscription | undefined;
 
   constructor(
     protected readonly ctx: Context,
@@ -50,7 +41,7 @@ export class ContextWatcher<T = unknown> implements ContextListener {
    */
   watch() {
     debug('Start watching context %s', this.ctx.name);
-    this.ctx.subscribe(this);
+    return (this._subscription = this.ctx.subscribe(this));
   }
 
   /**
@@ -58,7 +49,10 @@ export class ContextWatcher<T = unknown> implements ContextListener {
    */
   unwatch() {
     debug('Stop watching context %s', this.ctx.name);
-    this.ctx.unsubscribe(this);
+    if (this._subscription && !this._subscription.closed) {
+      this._subscription.unsubscribe();
+      this._subscription = undefined;
+    }
   }
 
   /**

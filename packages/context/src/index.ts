@@ -9,6 +9,7 @@ export * from './binding-decorator';
 export * from './binding-inspector';
 export * from './binding-key';
 export * from './context';
+export * from './context-listener';
 export * from './context-watcher';
 export * from './inject';
 export * from './keys';

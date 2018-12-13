@@ -12,6 +12,7 @@ import {
   isPromiseLike,
   BindingKey,
 } from '../..';
+import {ContextListener} from '../../src';
 
 /**
  * Create a subclass of context so that we can access parents and registry
@@ -679,6 +680,40 @@ describe('Context', () => {
         },
       });
     });
+  });
+
+  describe('events', () => {
+    let listener: ContextListener;
+
+    beforeEach(givenListener);
+
+    it('subscribes listeners', () => {
+      ctx.subscribe(listener);
+      expect(ctx.listeners.has(listener)).to.true();
+    });
+
+    it('unsubscribes listeners', () => {
+      ctx.subscribe(listener);
+      expect(ctx.listeners.has(listener)).to.true();
+      ctx.unsubscribe(listener);
+      expect(ctx.listeners.has(listener)).to.false();
+    });
+
+    it('allows subscription.unsubscribe()', () => {
+      const subscription = ctx.subscribe(listener);
+      expect(ctx.listeners.has(listener)).to.true();
+      subscription.unsubscribe();
+      expect(ctx.listeners.has(listener)).to.false();
+      expect(subscription.closed).to.be.true();
+    });
+
+    function givenListener() {
+      listener = {
+        filter: binding => false,
+        listen: (event, binding) => {},
+      };
+      return listener;
+    }
   });
 
   function createContext() {

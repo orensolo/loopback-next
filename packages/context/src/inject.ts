@@ -4,19 +4,20 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import {
-  MetadataInspector,
   DecoratorFactory,
+  InspectionOptions,
+  MetadataAccessor,
+  MetadataInspector,
+  MetadataMap,
   ParameterDecoratorFactory,
   PropertyDecoratorFactory,
-  MetadataMap,
-  MetadataAccessor,
-  InspectionOptions,
 } from '@loopback/metadata';
-import {BoundValue, ValueOrPromise} from './value-promise';
-import {Context, BindingFilter} from './context';
-import {BindingKey, BindingAddress} from './binding-key';
-import {ResolutionSession} from './resolution-session';
+import {BindingAddress, BindingKey} from './binding-key';
+import {Context} from './context';
+import {BindingFilter} from './context-listener';
 import {ContextWatcher} from './context-watcher';
+import {ResolutionSession} from './resolution-session';
+import {BoundValue, ValueOrPromise} from './value-promise';
 
 const PARAMETERS_KEY = MetadataAccessor.create<Injection, ParameterDecorator>(
   'inject:parameters',
