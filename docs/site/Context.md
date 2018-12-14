@@ -230,7 +230,7 @@ These "sugar" decorators allow you to quickly build up your application without
 having to code up all the additional logic by simply giving LoopBack hints (in
 the form of metadata) to your intent.
 
-## Context watcher
+## Context view
 
 Bindings in a context can come and go. It's often desirable for an artifact
 (especially an extension point) to keep track of other artifacts (extensions).
@@ -242,12 +242,12 @@ context. Ideally, the `RestServer` should be able to pick the new route without
 restarting.
 
 To support the dynamic tracking of such artifacts registered within a context
-chain, we introduce `ContextListener` interface and `ContextWatcher` class that
-can be used to watch a list of bindings matching certain criteria depicted by a
-`BindingFilter` function.
+chain, we introduce `ContextEventListener` interface and `ContextView` class
+that can be used to watch a list of bindings matching certain criteria depicted
+by a `BindingFilter` function.
 
 ```ts
-import {Context, ContextWatcher} from '@loopback/context';
+import {Context, ContextView} from '@loopback/context';
 
 // Set up a context chain
 const appCtx = new Context('app');
@@ -257,10 +257,10 @@ const serverCtx = new Context(appCtx, 'server'); // server -> app
 const controllerFilter = binding => binding.tagMap.controller != null;
 
 // Watch for bindings with tag `controller`
-const watcher = serverCtx.watch(controllerFilter);
+const view = serverCtx.watch(controllerFilter);
 
 // No controllers yet
-await watcher.values(); // returns []
+await view.values(); // returns []
 
 // Bind Controller1 to server context
 serverCtx
@@ -269,7 +269,7 @@ serverCtx
   .tag('controller');
 
 // Resolve to an instance of Controller1
-await watcher.values(); // returns [an instance of Controller1];
+await view.values(); // returns [an instance of Controller1];
 
 // Bind Controller2 to app context
 appCtx
@@ -278,28 +278,28 @@ appCtx
   .tag('controller');
 
 // Resolve to an instance of Controller1 and an instance of Controller2
-await watcher.values(); // returns [an instance of Controller1, an instance of Controller2];
+await view.values(); // returns [an instance of Controller1, an instance of Controller2];
 
 // Unbind Controller2
 appCtx.unbind('controllers.Controller2');
 
 // No more instance of Controller2
-await watcher.values(); // returns [an instance of Controller1];
+await view.values(); // returns [an instance of Controller1];
 ```
 
-The key benefit of `ContextWatcher` is that it caches resolved values until
-context bindings matching the filter function are added/removed. For most cases,
-we don't have to pay the penalty to find/resolve per request.
+The key benefit of `ContextView` is that it caches resolved values until context
+bindings matching the filter function are added/removed. For most cases, we
+don't have to pay the penalty to find/resolve per request.
 
 To fully leverage the live list of extensions, an extension point such as
-`RoutingTable` should either keep a pointer to an instance of `ContextWatcher`
+`RoutingTable` should either keep a pointer to an instance of `ContextView`
 corresponding to all `routes` (extensions) in the context chain and use the
 `values()` function to match again the live `routes` per request or implement
-itself as a `ContextListener` to rebuild the routes upon changes of routes in
-the context with `listen()`.
+itself as a `ContextEventListener` to rebuild the routes upon changes of routes
+in the context with `listen()`.
 
 If your dependency needs to follow the context for values from bindings matching
-a filter, use `@inject.filter` for dependency injection.
+a filter, use `@inject.view` for dependency injection.
 
 ```ts
 import {inject, Getter} from '@loopback/context';
@@ -308,7 +308,7 @@ import {DataSource} from '@loopback/repository';
 export class DataSourceTracker {
   constructor(
     // The target type is `Getter` function
-    @inject.filter({tags: ['datasource']})
+    @inject.view({tags: ['datasource']})
     private dataSources: Getter<DataSource[]>,
   ) {}
 
@@ -319,14 +319,14 @@ export class DataSourceTracker {
 }
 ```
 
-The `@inject.filter` decorator can take a `BindingFilter` function in addition
-to `BindingScopeAndTags`. And it can be applied to properties too. For example:
+The `@inject.view` decorator can take a `BindingFilter` function in addition to
+`BindingScopeAndTags`. And it can be applied to properties too. For example:
 
 ```ts
 export class DataSourceTracker {
-  // The target type is `ContextWatcher`
-  @inject.filter(binding => binding.tagMap['datasource'] != null)
-  private dataSources: ContextWatcher<DataSource>;
+  // The target type is `ContextView`
+  @inject.view(binding => binding.tagMap['datasource'] != null)
+  private dataSources: ContextView<DataSource>;
 
   async listDataSources(): Promise<DataSource[]> {
     // Use the Getter function to resolve data source instances
@@ -337,16 +337,15 @@ export class DataSourceTracker {
 }
 ```
 
-Please note that `@inject.filter` has two flavors:
+Please note that `@inject.view` has two flavors:
 
 - inject a snapshot of values from matching bindings without watching the
   context. This is the behavior if the target type is an array instead of Getter
-  or ContextWatcher.
-- inject a Getter/ContextWatcher so that it keeps track of context binding
-  changes.
+  or ContextView.
+- inject a Getter/ContextView so that it keeps track of context binding changes.
 
-The resolved value from `@inject.filter` injection varies on the target type:
+The resolved value from `@inject.view` injection varies on the target type:
 
 - Function -> a Getter function
-- ContextWatcher -> An instance of ContextWatcher
+- ContextView -> An instance of ContextView
 - other -> An array of values resolved from the current state of the context

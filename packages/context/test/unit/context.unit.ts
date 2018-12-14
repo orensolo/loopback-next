@@ -12,7 +12,7 @@ import {
   isPromiseLike,
   BindingKey,
 } from '../..';
-import {ContextListener} from '../../src';
+import {ContextEventListener} from '../../src';
 
 /**
  * Create a subclass of context so that we can access parents and registry
@@ -683,7 +683,7 @@ describe('Context', () => {
   });
 
   describe('events', () => {
-    let listener: ContextListener;
+    let listener: ContextEventListener;
 
     beforeEach(givenListener);
 

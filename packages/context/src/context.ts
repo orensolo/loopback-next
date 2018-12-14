@@ -11,10 +11,10 @@ import {BindingAddress, BindingKey} from './binding-key';
 import {
   BindingFilter,
   ContextEventType,
-  ContextListener,
+  ContextEventListener,
   Subscription,
 } from './context-listener';
-import {ContextWatcher} from './context-watcher';
+import {ContextView} from './context-view';
 import {ResolutionOptions, ResolutionSession} from './resolution-session';
 import {BoundValue, getDeepProperty, isPromiseLike} from './value-promise';
 
@@ -42,7 +42,7 @@ export class Context {
   /**
    * A list of registered context listeners
    */
-  public readonly listeners: Set<ContextListener> = new Set();
+  public readonly listeners: Set<ContextEventListener> = new Set();
 
   /**
    * Create a new context. For example,
@@ -109,9 +109,9 @@ export class Context {
     this.registry.set(key, binding);
     if (existingBinding !== binding) {
       if (existingBinding != null) {
-        this.notifyListeners(ContextEventType.unbind, existingBinding);
+        this.notifyListeners('unbind', existingBinding);
       }
-      this.notifyListeners(ContextEventType.bind, binding);
+      this.notifyListeners('bind', binding);
     }
     return this;
   }
@@ -133,7 +133,7 @@ export class Context {
     if (binding && binding.isLocked)
       throw new Error(`Cannot unbind key "${key}" of a locked binding`);
     const found = this.registry.delete(key);
-    this.notifyListeners(ContextEventType.unbind, binding);
+    this.notifyListeners('unbind', binding);
     return found;
   }
 
@@ -142,7 +142,7 @@ export class Context {
    * including its ancestors
    * @param listener Context listener
    */
-  subscribe(listener: ContextListener): Subscription {
+  subscribe(listener: ContextEventListener): Subscription {
     let ctx: Context | undefined = this;
     while (ctx != null) {
       ctx.listeners.add(listener);
@@ -155,7 +155,7 @@ export class Context {
    * Remove the context listener  from the context chain
    * @param listener Context listener
    */
-  unsubscribe(listener: ContextListener) {
+  unsubscribe(listener: ContextEventListener) {
     let ctx: Context | undefined = this;
     while (ctx != null) {
       ctx.listeners.delete(listener);
@@ -164,13 +164,13 @@ export class Context {
   }
 
   /**
-   * Watch the context chain with the given binding filter
+   * Create a view of the context chain with the given binding filter
    * @param filter A function to match bindings
    */
   watch<T = unknown>(filter: BindingFilter) {
-    const watcher = new ContextWatcher<T>(this, filter);
-    watcher.watch();
-    return watcher;
+    const view = new ContextView<T>(this, filter);
+    view.watch();
+    return view;
   }
 
   /**
@@ -189,7 +189,7 @@ export class Context {
     // Notify listeners in the next tick
     process.nextTick(async () => {
       for (const listener of this.listeners) {
-        if (listener.filter(binding)) {
+        if (!listener.filter || listener.filter(binding)) {
           try {
             await listener.listen(event, binding);
           } catch (err) {
@@ -623,7 +623,10 @@ function wildcardToRegExp(pattern: string): RegExp {
  * An implementation of `Subscription` interface for context events
  */
 class ContextSubscription implements Subscription {
-  constructor(protected ctx: Context, protected listener: ContextListener) {}
+  constructor(
+    protected ctx: Context,
+    protected listener: ContextEventListener,
+  ) {}
 
   private _closed = false;
 

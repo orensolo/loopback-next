@@ -1,17 +1,17 @@
 import {expect} from '@loopback/testlab';
 import {
   Context,
-  ContextWatcher,
-  ContextListener,
+  ContextView,
+  ContextEventListener,
   Getter,
   inject,
   ContextEventType,
   Binding,
 } from '../..';
 
-describe('ContextWatcher - watches matching bindings', () => {
+describe('ContextView - watches matching bindings', () => {
   let server: Context;
-  let contextWatcher: ContextWatcher;
+  let contextWatcher: ContextView;
   beforeEach(givenControllerWatcher);
 
   it('watches matching bindings', async () => {
@@ -56,20 +56,20 @@ describe('@inject.filter - injects a live collection of matching bindings', asyn
   beforeEach(givenPrimeNumbers);
 
   class MyControllerWithGetter {
-    @inject.filter(Context.bindingTagFilter('prime'), {watch: true})
+    @inject.view(Context.bindingTagFilter('prime'), {watch: true})
     getter: Getter<string[]>;
   }
 
   class MyControllerWithValues {
     constructor(
-      @inject.filter(Context.bindingTagFilter('prime'))
+      @inject.view(Context.bindingTagFilter('prime'))
       public values: string[],
     ) {}
   }
 
   class MyControllerWithTracker {
-    @inject.filter(Context.bindingTagFilter('prime'))
-    watcher: ContextWatcher<string[]>;
+    @inject.view(Context.bindingTagFilter('prime'))
+    view: ContextView<string[]>;
   }
 
   it('injects as getter', async () => {
@@ -89,18 +89,18 @@ describe('@inject.filter - injects a live collection of matching bindings', asyn
     expect(inst.values).to.eql([3, 5]);
   });
 
-  it('injects as a watcher', async () => {
+  it('injects as a view', async () => {
     ctx.bind('my-controller').toClass(MyControllerWithTracker);
     const inst = await ctx.get<MyControllerWithTracker>('my-controller');
-    const watcher = inst.watcher;
-    expect(await watcher.values()).to.eql([3, 5]);
+    const view = inst.view;
+    expect(await view.values()).to.eql([3, 5]);
     // Add a new binding that matches the filter
     // Add a new binding that matches the filter
     givenPrime(ctx, 7);
-    // The watcher picks up the new binding
-    expect(await watcher.values()).to.eql([3, 7, 5]);
+    // The view picks up the new binding
+    expect(await view.values()).to.eql([3, 7, 5]);
     ctx.unbind('prime.7');
-    expect(await watcher.values()).to.eql([3, 5]);
+    expect(await view.values()).to.eql([3, 5]);
   });
 
   function givenPrimeNumbers() {
@@ -117,7 +117,7 @@ describe('@inject.filter - injects a live collection of matching bindings', asyn
   }
 });
 
-describe('ContextListener - listens on matching bindings', () => {
+describe('ContextEventListener - listens on matching bindings', () => {
   let server: Context;
   let contextListener: MyListenerForControllers;
   beforeEach(givenControllerListener);
@@ -136,13 +136,13 @@ describe('ContextListener - listens on matching bindings', () => {
     expect(await getControllers()).to.eql(['3']);
   });
 
-  class MyListenerForControllers implements ContextListener {
+  class MyListenerForControllers implements ContextEventListener {
     controllers: Set<string> = new Set();
     filter = Context.bindingTagFilter('controller');
     listen(event: ContextEventType, binding: Readonly<Binding<unknown>>) {
-      if (event === ContextEventType.bind) {
+      if (event === 'bind') {
         this.controllers.add(binding.tagMap.name);
-      } else if (event === ContextEventType.unbind) {
+      } else if (event === 'unbind') {
         this.controllers.delete(binding.tagMap.name);
       }
     }

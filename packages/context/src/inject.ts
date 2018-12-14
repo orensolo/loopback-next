@@ -15,7 +15,7 @@ import {
 import {BindingAddress, BindingKey} from './binding-key';
 import {Context} from './context';
 import {BindingFilter} from './context-listener';
-import {ContextWatcher} from './context-watcher';
+import {ContextView} from './context-view';
 import {ResolutionSession} from './resolution-session';
 import {BoundValue, ValueOrPromise} from './value-promise';
 
@@ -261,7 +261,7 @@ export namespace inject {
       {decorator: '@inject.tag', tag: bindingTag},
       metadata,
     );
-    return filter(Context.bindingTagFilter(bindingTag), metadata);
+    return view(Context.bindingTagFilter(bindingTag), metadata);
   };
 
   /**
@@ -269,31 +269,31 @@ export namespace inject {
    *
    * ```ts
    * class MyControllerWithGetter {
-   *   @inject.filter(Context.bindingTagFilter('foo'))
+   *   @inject.view(Context.bindingTagFilter('foo'))
    *   getter: Getter<string[]>;
    * }
    *
    * class MyControllerWithValues {
    *   constructor(
-   *     @inject.filter(Context.bindingTagFilter('foo'))
+   *     @inject.view(Context.bindingTagFilter('foo'))
    *     public values: string[],
    *   ) {}
    * }
    *
-   * class MyControllerWithTracker {
-   *   @inject.filter(Context.bindingTagFilter('foo'))
-   *   watcher: BindingTracker<string[]>;
+   * class MyControllerWithView {
+   *   @inject.view(Context.bindingTagFilter('foo'))
+   *   view: ContextView<string[]>;
    * }
    * ```
    * @param bindingFilter A binding filter function
    * @param metadata
    */
-  export const filter = function injectByFilter(
+  export const view = function injectByFilter(
     bindingFilter: BindingFilter,
     metadata?: InjectionMetadata,
   ) {
     metadata = Object.assign(
-      {decorator: '@inject.filter', bindingFilter},
+      {decorator: '@inject.view', bindingFilter},
       metadata,
     );
     return inject('', metadata, resolveByFilter);
@@ -415,18 +415,18 @@ function resolveByFilter(
   session?: ResolutionSession,
 ) {
   const bindingFilter = injection.metadata!.bindingFilter;
-  const watcher = new ContextWatcher(ctx, bindingFilter);
+  const view = new ContextView(ctx, bindingFilter);
   const watch = injection.metadata!.watch;
 
   const targetType = inspectTargetType(injection);
   if (targetType === Function) {
-    if (watch !== false) watcher.watch();
-    return watcher.asGetter();
-  } else if (targetType === ContextWatcher) {
-    if (watch !== false) watcher.watch();
-    return watcher;
+    if (watch !== false) view.watch();
+    return view.asGetter();
+  } else if (targetType === ContextView) {
+    if (watch !== false) view.watch();
+    return view;
   } else {
-    return watcher.resolve(session);
+    return view.resolve(session);
   }
 }
 

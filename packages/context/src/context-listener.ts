@@ -9,10 +9,7 @@ import {ValueOrPromise} from './value-promise';
 /**
  * Context event types
  */
-export enum ContextEventType {
-  bind = 'bind',
-  unbind = 'unbind',
-}
+export type ContextEventType = 'bind' | 'unbind';
 
 /**
  * A function that filters bindings. It returns `true` to select a given
@@ -23,16 +20,17 @@ export type BindingFilter = (binding: Readonly<Binding<unknown>>) => boolean;
 /**
  * Listeners of context bind/unbind events
  */
-export interface ContextListener {
+export interface ContextEventListener {
   /**
    * A filter function to match bindings
    */
-  filter: BindingFilter;
+  filter?: BindingFilter;
+
   /**
-   * Listen on `bind` or `unbind` and invalidate the cache
+   * Listen on `bind` or `unbind`
    */
   listen(
-    event: ContextEventType,
+    eventType: ContextEventType,
     binding: Readonly<Binding<unknown>>,
   ): ValueOrPromise<void>;
 }

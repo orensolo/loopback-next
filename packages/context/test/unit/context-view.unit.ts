@@ -8,7 +8,7 @@ import {
   Binding,
   BindingScope,
   Context,
-  ContextWatcher,
+  ContextView,
   Getter,
   inject,
 } from '../..';
@@ -16,7 +16,7 @@ import {
 describe('ContextWatcher', () => {
   let ctx: Context;
   let bindings: Binding<unknown>[];
-  let contextWatcher: ContextWatcher;
+  let contextWatcher: ContextView;
 
   beforeEach(givenContextWatcher);
 
@@ -107,20 +107,20 @@ describe('@inject.filter', async () => {
   beforeEach(() => (ctx = givenContext()));
 
   class MyControllerWithGetter {
-    @inject.filter(Context.bindingTagFilter('foo'), {watch: true})
+    @inject.view(Context.bindingTagFilter('foo'), {watch: true})
     getter: Getter<string[]>;
   }
 
   class MyControllerWithValues {
     constructor(
-      @inject.filter(Context.bindingTagFilter('foo'))
+      @inject.view(Context.bindingTagFilter('foo'))
       public values: string[],
     ) {}
   }
 
   class MyControllerWithTracker {
-    @inject.filter(Context.bindingTagFilter('foo'))
-    tracker: ContextWatcher<string[]>;
+    @inject.view(Context.bindingTagFilter('foo'))
+    tracker: ContextView<string[]>;
   }
 
   it('injects as getter', async () => {
@@ -147,7 +147,7 @@ describe('@inject.filter', async () => {
   it('injects as a tracker', async () => {
     ctx.bind('my-controller').toClass(MyControllerWithTracker);
     const inst = await ctx.get<MyControllerWithTracker>('my-controller');
-    expect(inst.tracker).to.be.instanceOf(ContextWatcher);
+    expect(inst.tracker).to.be.instanceOf(ContextView);
     expect(await inst.tracker.values()).to.eql(['BAR', 'FOO']);
     // Add a new binding that matches the filter
     ctx

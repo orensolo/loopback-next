@@ -10,7 +10,7 @@ export * from './binding-inspector';
 export * from './binding-key';
 export * from './context';
 export * from './context-listener';
-export * from './context-watcher';
+export * from './context-view';
 export * from './inject';
 export * from './keys';
 export * from './provider';

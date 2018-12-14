@@ -9,24 +9,26 @@ import {Context} from './context';
 import {
   BindingFilter,
   ContextEventType,
-  ContextListener,
+  ContextEventListener,
   Subscription,
 } from './context-listener';
 import {Getter} from './inject';
 import {ResolutionSession} from './resolution-session';
 import {resolveList} from './value-promise';
-const debug = debugFactory('loopback:context:watcher');
+import {promisify} from 'util';
+const debug = debugFactory('loopback:context:view');
 
 /**
- * Watching a given context chain to maintain a live list of matching bindings
- * and their resolved values within the context hierarchy.
+ * `ContextView` provides a view for a given context chain to maintain a live
+ * list of matching bindings and their resolved values within the context
+ * hierarchy.
  *
  * This class is the key utility to implement dynamic extensions for extension
  * points. For example, the RestServer can react to `controller` bindings even
  * they are added/removed/updated after the application starts.
  *
  */
-export class ContextWatcher<T = unknown> implements ContextListener {
+export class ContextView<T = unknown> implements ContextEventListener {
   protected _cachedBindings: Readonly<Binding<T>>[] | undefined;
   protected _cachedValues: T[] | undefined;
   private _subscription: Subscription | undefined;
@@ -84,7 +86,7 @@ export class ContextWatcher<T = unknown> implements ContextListener {
   }
 
   /**
-   * Reset the watcher by invalidating its cache
+   * Reset the view by invalidating its cache
    */
   reset() {
     debug('Invalidating cache');
@@ -98,6 +100,7 @@ export class ContextWatcher<T = unknown> implements ContextListener {
    */
   resolve(session?: ResolutionSession) {
     debug('Resolving values');
+    // We don't cache values with this method
     return resolveList(this.bindings, b => {
       return b.getValue(this.ctx, ResolutionSession.fork(session));
     });
@@ -109,16 +112,12 @@ export class ContextWatcher<T = unknown> implements ContextListener {
    */
   async values(): Promise<T[]> {
     debug('Reading values');
-    // [REVIEW] We need to get values in the next tick so that it can pick up
-    // binding changes as `Context` publishes such events in `process.nextTick`
-    return new Promise<T[]>(resolve => {
-      process.nextTick(async () => {
-        if (this._cachedValues == null) {
-          this._cachedValues = await this.resolve();
-        }
-        resolve(this._cachedValues);
-      });
-    });
+    // Wait for the next tick so that context event notification can be emitted
+    await promisify(process.nextTick)();
+    if (this._cachedValues == null) {
+      this._cachedValues = await this.resolve();
+    }
+    return this._cachedValues;
   }
 
   /**
