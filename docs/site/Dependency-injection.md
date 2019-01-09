@@ -243,11 +243,13 @@ export class MyController {
 
 There are a few special decorators from the `inject` namespace.
 
-- @inject.getter
-- @inject.setter
-- @inject.context
-- @inject.tag
-- @inject.filter
+- `@inject.getter`
+- `@inject.setter`
+- `@inject.context`
+- `@inject.tag`
+- `@inject.view`
+
+See [Inject decorators](Decorators_inject.md) for more details.
 
 ## Circular dependencies
 

@@ -6,7 +6,9 @@ sidebar: lb4_sidebar
 permalink: /doc/en/lb4/Decorators_inject.html
 ---
 
-## Dependency Injection Decorator
+## Dependency Injection Decorators
+
+### @inject
 
 `@inject` is a decorator to annotate class properties or constructor arguments
 for automatic injection by LoopBack's IoC container.
@@ -66,10 +68,12 @@ export class WidgetController {
 ```
 
 A few variants of `@inject` are provided to declare special forms of
-dependencies:
+dependencies.
 
-- `@inject.getter`: inject a getter function that returns a promise of the bound
-  value of the key
+### @inject.getter
+
+`@inject.getter` injects a getter function that returns a promise of the bound
+value of the key.
 
 Syntax: `@inject.getter(bindingKey: string)`.
 
@@ -92,7 +96,9 @@ export class HelloController {
 }
 ```
 
-- `@inject.setter`: inject a setter function to set the bound value of the key
+### @inject.setter
+
+`@inject.setter` injects a setter function to set the bound value of the key.
 
 Syntax: `@inject.setter(bindingKey: string)`.
 
@@ -111,8 +117,10 @@ export class HelloController {
 }
 ```
 
-- `@inject.tag`: inject an array of values by a pattern or regexp to match
-  binding tags
+### @inject.tag
+
+`@inject.tag` injects an array of values by a pattern or regexp to match binding
+tags.
 
 Syntax: `@inject.tag(tag: string | RegExp)`.
 
@@ -135,7 +143,63 @@ const store = ctx.getSync<Store>('store');
 console.log(store.locations); // ['San Francisco', 'San Jose']
 ```
 
-- `@inject.context`: inject the current context
+### @inject.view
+
+`@inject.view` injects a `ContextView` to track a list of bindings matching a
+filter function or scope/tags.
+
+```ts
+import {inject, Getter} from '@loopback/context';
+import {DataSource} from '@loopback/repository';
+
+export class DataSourceTracker {
+  constructor(
+    // The target type is `Getter` function
+    @inject.view({tags: ['datasource']})
+    private dataSources: Getter<DataSource[]>,
+  ) {}
+
+  async listDataSources(): Promise<DataSource[]> {
+    // Use the Getter function to resolve data source instances
+    return await this.dataSources();
+  }
+}
+```
+
+The `@inject.view` decorator can take a `BindingFilter` function in addition to
+`BindingScopeAndTags`. And it can be applied to properties too. For example:
+
+```ts
+export class DataSourceTracker {
+  // The target type is `ContextView`
+  @inject.view(binding => binding.tagMap['datasource'] != null)
+  private dataSources: ContextView<DataSource>;
+
+  async listDataSources(): Promise<DataSource[]> {
+    // Use the Getter function to resolve data source instances
+    return await this.dataSources.values();
+  }
+
+  // ...
+}
+```
+
+Please note that `@inject.view` has two flavors:
+
+- inject a snapshot of values from matching bindings without watching the
+  context. This is the behavior if the target type is an array instead of Getter
+  or ContextView.
+- inject a Getter/ContextView so that it keeps track of context binding changes.
+
+The resolved value from `@inject.view` injection varies on the target type:
+
+- Function -> a Getter function
+- ContextView -> An instance of ContextView
+- other -> An array of values resolved from the current state of the context
+
+### @inject.context
+
+`@inject.context` injects the current context.
 
 Syntax: `@inject.context()`.
 

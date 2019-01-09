@@ -42,7 +42,7 @@ export class Context {
   /**
    * A list of registered context listeners
    */
-  public readonly listeners: Set<ContextEventListener> = new Set();
+  protected readonly listeners: Set<ContextEventListener> = new Set();
 
   /**
    * Create a new context. For example,
@@ -164,10 +164,18 @@ export class Context {
   }
 
   /**
+   * Check if a listener is subscribed to this context
+   * @param listener Context listener
+   */
+  isSubscribed(listener: ContextEventListener) {
+    return this.listeners.has(listener);
+  }
+
+  /**
    * Create a view of the context chain with the given binding filter
    * @param filter A function to match bindings
    */
-  watch<T = unknown>(filter: BindingFilter) {
+  createView<T = unknown>(filter: BindingFilter) {
     const view = new ContextView<T>(this, filter);
     view.watch();
     return view;

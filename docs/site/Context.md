@@ -236,10 +236,9 @@ Bindings in a context can come and go. It's often desirable for an artifact
 (especially an extension point) to keep track of other artifacts (extensions).
 For example, the `RestServer` needs to know routes contributed by `controller`
 classes or other handlers. Such routes can be added or removed after the
-`RestServer` starts. For example, a controller can be added even after the
-application starts and it causes a new route to be bound into the application
-context. Ideally, the `RestServer` should be able to pick the new route without
-restarting.
+`RestServer` starts. When a controller is added after the application starts,
+new routes are bound into the application context. Ideally, the `RestServer`
+should be able to pick up these new routes without restarting.
 
 To support the dynamic tracking of such artifacts registered within a context
 chain, we introduce `ContextEventListener` interface and `ContextView` class
@@ -299,53 +298,5 @@ itself as a `ContextEventListener` to rebuild the routes upon changes of routes
 in the context with `listen()`.
 
 If your dependency needs to follow the context for values from bindings matching
-a filter, use `@inject.view` for dependency injection.
-
-```ts
-import {inject, Getter} from '@loopback/context';
-import {DataSource} from '@loopback/repository';
-
-export class DataSourceTracker {
-  constructor(
-    // The target type is `Getter` function
-    @inject.view({tags: ['datasource']})
-    private dataSources: Getter<DataSource[]>,
-  ) {}
-
-  async listDataSources(): Promise<DataSource[]> {
-    // Use the Getter function to resolve data source instances
-    return await this.dataSources();
-  }
-}
-```
-
-The `@inject.view` decorator can take a `BindingFilter` function in addition to
-`BindingScopeAndTags`. And it can be applied to properties too. For example:
-
-```ts
-export class DataSourceTracker {
-  // The target type is `ContextView`
-  @inject.view(binding => binding.tagMap['datasource'] != null)
-  private dataSources: ContextView<DataSource>;
-
-  async listDataSources(): Promise<DataSource[]> {
-    // Use the Getter function to resolve data source instances
-    return await this.dataSources.values();
-  }
-
-  // ...
-}
-```
-
-Please note that `@inject.view` has two flavors:
-
-- inject a snapshot of values from matching bindings without watching the
-  context. This is the behavior if the target type is an array instead of Getter
-  or ContextView.
-- inject a Getter/ContextView so that it keeps track of context binding changes.
-
-The resolved value from `@inject.view` injection varies on the target type:
-
-- Function -> a Getter function
-- ContextView -> An instance of ContextView
-- other -> An array of values resolved from the current state of the context
+a filter, use [`@inject.view`](Decorators_inject.md#@inject.view) for dependency
+injection.

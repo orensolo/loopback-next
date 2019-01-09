@@ -30,7 +30,7 @@ describe('ContextView - watches matching bindings', () => {
 
   function givenControllerWatcher() {
     server = givenServerWithinAnApp();
-    contextWatcher = server.watch(Context.bindingTagFilter('controller'));
+    contextWatcher = server.createView(Context.bindingTagFilter('controller'));
     givenController(server, '1');
     givenController(server.parent!, '2');
   }

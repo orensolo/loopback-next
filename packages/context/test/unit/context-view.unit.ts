@@ -4,37 +4,30 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import {expect} from '@loopback/testlab';
-import {
-  Binding,
-  BindingScope,
-  Context,
-  ContextView,
-  Getter,
-  inject,
-} from '../..';
+import {Binding, BindingScope, Context, ContextView} from '../..';
 
-describe('ContextWatcher', () => {
+describe('ContextView', () => {
   let ctx: Context;
   let bindings: Binding<unknown>[];
-  let contextWatcher: ContextView;
+  let contextView: ContextView;
 
-  beforeEach(givenContextWatcher);
+  beforeEach(givenContextView);
 
   it('tracks bindings', () => {
-    expect(contextWatcher.bindings).to.eql(bindings);
+    expect(contextView.bindings).to.eql(bindings);
   });
 
   it('resolves bindings', async () => {
-    expect(await contextWatcher.resolve()).to.eql(['BAR', 'FOO']);
-    expect(await contextWatcher.values()).to.eql(['BAR', 'FOO']);
+    expect(await contextView.resolve()).to.eql(['BAR', 'FOO']);
+    expect(await contextView.values()).to.eql(['BAR', 'FOO']);
   });
 
   it('resolves bindings as a getter', async () => {
-    expect(await contextWatcher.asGetter()()).to.eql(['BAR', 'FOO']);
+    expect(await contextView.asGetter()()).to.eql(['BAR', 'FOO']);
   });
 
   it('reloads bindings after reset', async () => {
-    contextWatcher.reset();
+    contextView.reset();
     const abcBinding = ctx
       .bind('abc')
       .to('ABC')
@@ -43,10 +36,10 @@ describe('ContextWatcher', () => {
       .bind('xyz')
       .to('XYZ')
       .tag('foo');
-    expect(contextWatcher.bindings).to.containEql(xyzBinding);
+    expect(contextView.bindings).to.containEql(xyzBinding);
     // `abc` does not have the matching tag
-    expect(contextWatcher.bindings).to.not.containEql(abcBinding);
-    expect(await contextWatcher.values()).to.eql(['BAR', 'XYZ', 'FOO']);
+    expect(contextView.bindings).to.not.containEql(abcBinding);
+    expect(await contextView.values()).to.eql(['BAR', 'XYZ', 'FOO']);
   });
 
   it('reloads bindings if context bindings are added', async () => {
@@ -58,20 +51,20 @@ describe('ContextWatcher', () => {
       .bind('xyz')
       .to('XYZ')
       .tag('foo');
-    expect(contextWatcher.bindings).to.containEql(xyzBinding);
+    expect(contextView.bindings).to.containEql(xyzBinding);
     // `abc` does not have the matching tag
-    expect(contextWatcher.bindings).to.not.containEql(abcBinding);
-    expect(await contextWatcher.values()).to.eql(['BAR', 'XYZ', 'FOO']);
+    expect(contextView.bindings).to.not.containEql(abcBinding);
+    expect(await contextView.values()).to.eql(['BAR', 'XYZ', 'FOO']);
   });
 
   it('reloads bindings if context bindings are removed', async () => {
     ctx.unbind('bar');
-    expect(await contextWatcher.values()).to.eql(['FOO']);
+    expect(await contextView.values()).to.eql(['FOO']);
   });
 
   it('reloads bindings if context bindings are rebound', async () => {
     ctx.bind('bar').to('BAR'); // No more tagged with `foo`
-    expect(await contextWatcher.values()).to.eql(['FOO']);
+    expect(await contextView.values()).to.eql(['FOO']);
   });
 
   it('reloads bindings if parent context bindings are added', async () => {
@@ -79,84 +72,27 @@ describe('ContextWatcher', () => {
       .parent!.bind('xyz')
       .to('XYZ')
       .tag('foo');
-    expect(contextWatcher.bindings).to.containEql(xyzBinding);
-    expect(await contextWatcher.values()).to.eql(['BAR', 'FOO', 'XYZ']);
+    expect(contextView.bindings).to.containEql(xyzBinding);
+    expect(await contextView.values()).to.eql(['BAR', 'FOO', 'XYZ']);
   });
 
   it('reloads bindings if parent context bindings are removed', async () => {
     ctx.parent!.unbind('foo');
-    expect(await contextWatcher.values()).to.eql(['BAR']);
+    expect(await contextView.values()).to.eql(['BAR']);
   });
 
   it('stops watching', async () => {
-    expect(await contextWatcher.values()).to.eql(['BAR', 'FOO']);
-    contextWatcher.unwatch();
+    expect(await contextView.values()).to.eql(['BAR', 'FOO']);
+    contextView.unwatch();
     ctx.parent!.unbind('foo');
-    expect(await contextWatcher.values()).to.eql(['BAR', 'FOO']);
+    expect(await contextView.values()).to.eql(['BAR', 'FOO']);
   });
 
-  function givenContextWatcher() {
+  function givenContextView() {
     bindings = [];
     ctx = givenContext(bindings);
-    contextWatcher = ctx.watch(Context.bindingTagFilter('foo'));
+    contextView = ctx.createView(Context.bindingTagFilter('foo'));
   }
-});
-
-describe('@inject.filter', async () => {
-  let ctx: Context;
-  beforeEach(() => (ctx = givenContext()));
-
-  class MyControllerWithGetter {
-    @inject.view(Context.bindingTagFilter('foo'), {watch: true})
-    getter: Getter<string[]>;
-  }
-
-  class MyControllerWithValues {
-    constructor(
-      @inject.view(Context.bindingTagFilter('foo'))
-      public values: string[],
-    ) {}
-  }
-
-  class MyControllerWithTracker {
-    @inject.view(Context.bindingTagFilter('foo'))
-    tracker: ContextView<string[]>;
-  }
-
-  it('injects as getter', async () => {
-    ctx.bind('my-controller').toClass(MyControllerWithGetter);
-    const inst = await ctx.get<MyControllerWithGetter>('my-controller');
-    const getter = inst.getter;
-    expect(getter).to.be.a.Function();
-    expect(await getter()).to.eql(['BAR', 'FOO']);
-    // Add a new binding that matches the filter
-    ctx
-      .bind('xyz')
-      .to('XYZ')
-      .tag('foo');
-    // The getter picks up the new binding
-    expect(await getter()).to.eql(['BAR', 'XYZ', 'FOO']);
-  });
-
-  it('injects as values', async () => {
-    ctx.bind('my-controller').toClass(MyControllerWithValues);
-    const inst = await ctx.get<MyControllerWithValues>('my-controller');
-    expect(inst.values).to.eql(['BAR', 'FOO']);
-  });
-
-  it('injects as a tracker', async () => {
-    ctx.bind('my-controller').toClass(MyControllerWithTracker);
-    const inst = await ctx.get<MyControllerWithTracker>('my-controller');
-    expect(inst.tracker).to.be.instanceOf(ContextView);
-    expect(await inst.tracker.values()).to.eql(['BAR', 'FOO']);
-    // Add a new binding that matches the filter
-    ctx
-      .bind('xyz')
-      .to('XYZ')
-      .tag('foo');
-    // The tracker picks up the new binding
-    expect(await inst.tracker.values()).to.eql(['BAR', 'XYZ', 'FOO']);
-  });
 });
 
 function givenContext(bindings: Binding[] = []) {

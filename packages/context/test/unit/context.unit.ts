@@ -5,14 +5,14 @@
 
 import {expect} from '@loopback/testlab';
 import {
-  Context,
   Binding,
+  BindingKey,
   BindingScope,
   BindingType,
+  Context,
+  ContextEventListener,
   isPromiseLike,
-  BindingKey,
 } from '../..';
-import {ContextEventListener} from '../../src';
 
 /**
  * Create a subclass of context so that we can access parents and registry
@@ -689,21 +689,21 @@ describe('Context', () => {
 
     it('subscribes listeners', () => {
       ctx.subscribe(listener);
-      expect(ctx.listeners.has(listener)).to.true();
+      expect(ctx.isSubscribed(listener)).to.true();
     });
 
     it('unsubscribes listeners', () => {
       ctx.subscribe(listener);
-      expect(ctx.listeners.has(listener)).to.true();
+      expect(ctx.isSubscribed(listener)).to.true();
       ctx.unsubscribe(listener);
-      expect(ctx.listeners.has(listener)).to.false();
+      expect(ctx.isSubscribed(listener)).to.false();
     });
 
     it('allows subscription.unsubscribe()', () => {
       const subscription = ctx.subscribe(listener);
-      expect(ctx.listeners.has(listener)).to.true();
+      expect(ctx.isSubscribed(listener)).to.true();
       subscription.unsubscribe();
-      expect(ctx.listeners.has(listener)).to.false();
+      expect(ctx.isSubscribed(listener)).to.false();
       expect(subscription.closed).to.be.true();
     });
 
