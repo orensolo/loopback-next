@@ -4,7 +4,13 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import {expect} from '@loopback/testlab';
-import {Binding, BindingScope, Context, ContextView} from '../..';
+import {
+  Binding,
+  BindingScope,
+  bindingTagFilter,
+  Context,
+  ContextView,
+} from '../..';
 
 describe('ContextView', () => {
   let ctx: Context;
@@ -91,7 +97,7 @@ describe('ContextView', () => {
   function givenContextView() {
     bindings = [];
     ctx = givenContext(bindings);
-    contextView = ctx.createView(Context.bindingTagFilter('foo'));
+    contextView = ctx.createView(bindingTagFilter('foo'));
   }
 });
 

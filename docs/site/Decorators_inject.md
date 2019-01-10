@@ -10,6 +10,9 @@ permalink: /doc/en/lb4/Decorators_inject.html
 
 ### @inject
 
+Syntax:
+`@inject(bindingSelector: BindingSelector, metadata?: InjectionMetadata)`.
+
 `@inject` is a decorator to annotate class properties or constructor arguments
 for automatic injection by LoopBack's IoC container.
 
@@ -67,6 +70,18 @@ export class WidgetController {
 }
 ```
 
+The `@inject` decorator now also accepts a binding filter function so that an
+array of values can be injected.
+
+```ts
+class MyControllerWithValues {
+  constructor(
+    @inject(binding => binding.tagNames.includes('foo'))
+    public values: string[],
+  ) {}
+}
+```
+
 A few variants of `@inject` are provided to declare special forms of
 dependencies.
 
@@ -75,7 +90,7 @@ dependencies.
 `@inject.getter` injects a getter function that returns a promise of the bound
 value of the key.
 
-Syntax: `@inject.getter(bindingKey: string)`.
+Syntax: `@inject.getter(bindingSelector: BindingSelector)`.
 
 ```ts
 import {inject, Getter} from '@loopback/context';
@@ -93,6 +108,16 @@ export class HelloController {
     const user = await this.userGetter();
     return `Hello, ${user.name}`;
   }
+}
+```
+
+`@inject.getter` also allows the getter function to return an array of values
+from bindings that match a filter function.
+
+```ts
+class MyControllerWithGetter {
+  @inject.getter(bindingTagFilter('prime'))
+  getter: Getter<number[]>;
 }
 ```
 
@@ -122,7 +147,7 @@ export class HelloController {
 `@inject.tag` injects an array of values by a pattern or regexp to match binding
 tags.
 
-Syntax: `@inject.tag(tag: string | RegExp)`.
+Syntax: `@inject.tag(tag: BindingTag | RegExp)`.
 
 ```ts
 class Store {
@@ -145,57 +170,41 @@ console.log(store.locations); // ['San Francisco', 'San Jose']
 
 ### @inject.view
 
-`@inject.view` injects a `ContextView` to track a list of bindings matching a
-filter function or scope/tags.
+`@inject.view` injects a `ContextView` to track a list of bound values matching
+a filter function.
 
 ```ts
-import {inject, Getter} from '@loopback/context';
+import {inject} from '@loopback/context';
 import {DataSource} from '@loopback/repository';
 
 export class DataSourceTracker {
   constructor(
-    // The target type is `Getter` function
-    @inject.view({tags: ['datasource']})
-    private dataSources: Getter<DataSource[]>,
+    @inject.view(bindingTagFilter('datasource'))
+    private dataSources: ContextView<DataSource[]>,
   ) {}
-
-  async listDataSources(): Promise<DataSource[]> {
-    // Use the Getter function to resolve data source instances
-    return await this.dataSources();
-  }
-}
-```
-
-The `@inject.view` decorator can take a `BindingFilter` function in addition to
-`BindingScopeAndTags`. And it can be applied to properties too. For example:
-
-```ts
-export class DataSourceTracker {
-  // The target type is `ContextView`
-  @inject.view(binding => binding.tagMap['datasource'] != null)
-  private dataSources: ContextView<DataSource>;
 
   async listDataSources(): Promise<DataSource[]> {
     // Use the Getter function to resolve data source instances
     return await this.dataSources.values();
   }
-
-  // ...
 }
 ```
 
-Please note that `@inject.view` has two flavors:
+In the example above, `bindingTagFilter` is a helper function that creates a
+filter function that matches a given tag. You can define your own filter
+functions, such as:
 
-- inject a snapshot of values from matching bindings without watching the
-  context. This is the behavior if the target type is an array instead of Getter
-  or ContextView.
-- inject a Getter/ContextView so that it keeps track of context binding changes.
+```ts
+export class DataSourceTracker {
+  constructor(
+    @inject.view(binding => binding.tagNames.includes('datasource'))
+    private dataSources: ContextView<DataSource[]>,
+  ) {}
+}
+```
 
-The resolved value from `@inject.view` injection varies on the target type:
-
-- Function -> a Getter function
-- ContextView -> An instance of ContextView
-- other -> An array of values resolved from the current state of the context
+The `@inject.view` decorator takes a `BindingFilter` function. It can only be
+applied to a property or method parameter of `ContextView` type.
 
 ### @inject.context
 

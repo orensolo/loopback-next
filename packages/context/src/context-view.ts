@@ -4,18 +4,18 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import * as debugFactory from 'debug';
+import {promisify} from 'util';
 import {Binding} from './binding';
+import {BindingFilter} from './binding-filter';
 import {Context} from './context';
 import {
-  BindingFilter,
-  ContextEventType,
   ContextEventListener,
+  ContextEventType,
   Subscription,
 } from './context-listener';
 import {Getter} from './inject';
 import {ResolutionSession} from './resolution-session';
 import {resolveList} from './value-promise';
-import {promisify} from 'util';
 const debug = debugFactory('loopback:context:view');
 
 /**

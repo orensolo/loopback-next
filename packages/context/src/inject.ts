@@ -12,9 +12,10 @@ import {
   ParameterDecoratorFactory,
   PropertyDecoratorFactory,
 } from '@loopback/metadata';
-import {BindingAddress, BindingKey} from './binding-key';
+import {BindingTag} from './binding';
+import {BindingFilter, bindingTagFilter} from './binding-filter';
+import {BindingAddress} from './binding-key';
 import {Context} from './context';
-import {BindingFilter} from './context-listener';
 import {ContextView} from './context-view';
 import {ResolutionSession} from './resolution-session';
 import {BoundValue, ValueOrPromise} from './value-promise';
@@ -57,6 +58,13 @@ export interface InjectionMetadata {
 }
 
 /**
+ * Select binding(s) by key or a filter function
+ */
+export type BindingSelector<ValueType = unknown> =
+  | BindingAddress<ValueType>
+  | BindingFilter;
+
+/**
  * Descriptor for an injection point
  */
 export interface Injection<ValueType = BoundValue> {
@@ -66,7 +74,7 @@ export interface Injection<ValueType = BoundValue> {
     | TypedPropertyDescriptor<ValueType>
     | number;
 
-  bindingKey: BindingAddress<ValueType>; // Binding key
+  bindingSelector: BindingSelector<ValueType>; // Binding selector
   metadata?: InjectionMetadata; // Related metadata
   resolve?: ResolverFunction; // A custom resolve function
 }
@@ -91,17 +99,20 @@ export interface Injection<ValueType = BoundValue> {
  *
  *  - TODO(bajtos)
  *
- * @param bindingKey What binding to use in order to resolve the value of the
+ * @param bindingSelector What binding to use in order to resolve the value of the
  * decorated constructor parameter or property.
  * @param metadata Optional metadata to help the injection
  * @param resolve Optional function to resolve the injection
  *
  */
 export function inject(
-  bindingKey: string | BindingKey<BoundValue>,
+  bindingSelector: BindingSelector,
   metadata?: InjectionMetadata,
   resolve?: ResolverFunction,
 ) {
+  if (typeof bindingSelector === 'function' && !resolve) {
+    resolve = resolveByFilter;
+  }
   metadata = Object.assign({decorator: '@inject'}, metadata);
   return function markParameterOrPropertyAsInjected(
     target: Object,
@@ -121,7 +132,7 @@ export function inject(
           target,
           member,
           methodDescriptorOrParameterIndex,
-          bindingKey,
+          bindingSelector,
           metadata,
           resolve,
         },
@@ -157,7 +168,7 @@ export function inject(
           target,
           member,
           methodDescriptorOrParameterIndex,
-          bindingKey,
+          bindingSelector,
           metadata,
           resolve,
         },
@@ -177,7 +188,7 @@ export function inject(
 }
 
 /**
- * The function injected by `@inject.getter(key)`.
+ * The function injected by `@inject.getter(bindingSelector)`.
  */
 export type Getter<T> = () => Promise<T>;
 
@@ -207,15 +218,16 @@ export namespace inject {
    *
    * See also `Getter<T>`.
    *
-   * @param bindingKey The key of the value we want to eventually get.
+   * @param bindingSelector The binding key or filter we want to eventually get
+   * value(s) from.
    * @param metadata Optional metadata to help the injection
    */
   export const getter = function injectGetter(
-    bindingKey: BindingAddress<BoundValue>,
+    bindingSelector: BindingSelector<unknown>,
     metadata?: InjectionMetadata,
   ) {
     metadata = Object.assign({decorator: '@inject.getter'}, metadata);
-    return inject(bindingKey, metadata, resolveAsGetter);
+    return inject(bindingSelector, metadata, resolveAsGetter);
   };
 
   /**
@@ -250,36 +262,24 @@ export namespace inject {
    *   ) {}
    * }
    * ```
-   * @param bindingTag Tag name or regex
+   * @param bindingTag Tag name, regex or object
    * @param metadata Optional metadata to help the injection
    */
   export const tag = function injectByTag(
-    bindingTag: string | RegExp,
+    bindingTag: BindingTag | RegExp,
     metadata?: InjectionMetadata,
   ) {
     metadata = Object.assign(
       {decorator: '@inject.tag', tag: bindingTag},
       metadata,
     );
-    return view(Context.bindingTagFilter(bindingTag), metadata);
+    return inject(bindingTagFilter(bindingTag), metadata);
   };
 
   /**
    * Inject matching bound values by the filter function
    *
    * ```ts
-   * class MyControllerWithGetter {
-   *   @inject.view(Context.bindingTagFilter('foo'))
-   *   getter: Getter<string[]>;
-   * }
-   *
-   * class MyControllerWithValues {
-   *   constructor(
-   *     @inject.view(Context.bindingTagFilter('foo'))
-   *     public values: string[],
-   *   ) {}
-   * }
-   *
    * class MyControllerWithView {
    *   @inject.view(Context.bindingTagFilter('foo'))
    *   view: ContextView<string[]>;
@@ -292,11 +292,8 @@ export namespace inject {
     bindingFilter: BindingFilter,
     metadata?: InjectionMetadata,
   ) {
-    metadata = Object.assign(
-      {decorator: '@inject.view', bindingFilter},
-      metadata,
-    );
-    return inject('', metadata, resolveByFilter);
+    metadata = Object.assign({decorator: '@inject.view'}, metadata);
+    return inject(bindingFilter, metadata, resolveByFilter);
   };
 
   /**
@@ -325,10 +322,13 @@ function resolveAsGetter(
       `The target type ${targetType.name} is not a Getter function`,
     );
   }
+  if (typeof injection.bindingSelector === 'function') {
+    return resolveByFilter(ctx, injection, session);
+  }
   // We need to clone the session for the getter as it will be resolved later
   session = ResolutionSession.fork(session);
   return function getter() {
-    return ctx.get(injection.bindingKey, {
+    return ctx.get(injection.bindingSelector as BindingAddress, {
       session,
       optional: injection.metadata && injection.metadata.optional,
     });
@@ -343,8 +343,8 @@ function resolveAsSetter(ctx: Context, injection: Injection) {
     );
   }
   // No resolution session should be propagated into the setter
-  return function setter(value: BoundValue) {
-    ctx.bind(injection.bindingKey).to(value);
+  return function setter(value: unknown) {
+    ctx.bind(injection.bindingSelector as BindingAddress).to(value);
   };
 }
 
@@ -414,11 +414,16 @@ function resolveByFilter(
   injection: Readonly<Injection>,
   session?: ResolutionSession,
 ) {
-  const bindingFilter = injection.metadata!.bindingFilter;
+  const targetType = inspectTargetType(injection);
+  if (injection.metadata && injection.metadata.decorator === '@inject.view') {
+    if (targetType && targetType !== ContextView) {
+      throw new Error(`The target type ${targetType.name} is not ContextView`);
+    }
+  }
+  const bindingFilter = injection.bindingSelector as BindingFilter;
   const view = new ContextView(ctx, bindingFilter);
   const watch = injection.metadata!.watch;
 
-  const targetType = inspectTargetType(injection);
   if (targetType === Function) {
     if (watch !== false) view.watch();
     return view.asGetter();

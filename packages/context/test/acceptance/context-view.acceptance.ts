@@ -1,12 +1,13 @@
 import {expect} from '@loopback/testlab';
 import {
+  Binding,
+  bindingTagFilter,
   Context,
-  ContextView,
   ContextEventListener,
+  ContextEventType,
+  ContextView,
   Getter,
   inject,
-  ContextEventType,
-  Binding,
 } from '../..';
 
 describe('ContextView - watches matching bindings', () => {
@@ -30,7 +31,7 @@ describe('ContextView - watches matching bindings', () => {
 
   function givenControllerWatcher() {
     server = givenServerWithinAnApp();
-    contextWatcher = server.createView(Context.bindingTagFilter('controller'));
+    contextWatcher = server.createView(bindingTagFilter('controller'));
     givenController(server, '1');
     givenController(server.parent!, '2');
   }
@@ -51,25 +52,25 @@ describe('ContextView - watches matching bindings', () => {
   }
 });
 
-describe('@inject.filter - injects a live collection of matching bindings', async () => {
+describe('@inject.* - injects a live collection of matching bindings', async () => {
   let ctx: Context;
   beforeEach(givenPrimeNumbers);
 
   class MyControllerWithGetter {
-    @inject.view(Context.bindingTagFilter('prime'), {watch: true})
-    getter: Getter<string[]>;
+    @inject.getter(bindingTagFilter('prime'), {watch: true})
+    getter: Getter<number[]>;
   }
 
   class MyControllerWithValues {
     constructor(
-      @inject.view(Context.bindingTagFilter('prime'))
-      public values: string[],
+      @inject(bindingTagFilter('prime'))
+      public values: number[],
     ) {}
   }
 
-  class MyControllerWithTracker {
-    @inject.view(Context.bindingTagFilter('prime'))
-    view: ContextView<string[]>;
+  class MyControllerWithView {
+    @inject.view(bindingTagFilter('prime'))
+    view: ContextView<number[]>;
   }
 
   it('injects as getter', async () => {
@@ -90,8 +91,8 @@ describe('@inject.filter - injects a live collection of matching bindings', asyn
   });
 
   it('injects as a view', async () => {
-    ctx.bind('my-controller').toClass(MyControllerWithTracker);
-    const inst = await ctx.get<MyControllerWithTracker>('my-controller');
+    ctx.bind('my-controller').toClass(MyControllerWithView);
+    const inst = await ctx.get<MyControllerWithView>('my-controller');
     const view = inst.view;
     expect(await view.values()).to.eql([3, 5]);
     // Add a new binding that matches the filter
@@ -138,7 +139,7 @@ describe('ContextEventListener - listens on matching bindings', () => {
 
   class MyListenerForControllers implements ContextEventListener {
     controllers: Set<string> = new Set();
-    filter = Context.bindingTagFilter('controller');
+    filter = bindingTagFilter('controller');
     listen(event: ContextEventType, binding: Readonly<Binding<unknown>>) {
       if (event === 'bind') {
         this.controllers.add(binding.tagMap.name);

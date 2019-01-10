@@ -4,18 +4,13 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import {Binding} from './binding';
+import {BindingFilter} from './binding-filter';
 import {ValueOrPromise} from './value-promise';
 
 /**
  * Context event types
  */
 export type ContextEventType = 'bind' | 'unbind';
-
-/**
- * A function that filters bindings. It returns `true` to select a given
- * binding.
- */
-export type BindingFilter = (binding: Readonly<Binding<unknown>>) => boolean;
 
 /**
  * Listeners of context bind/unbind events

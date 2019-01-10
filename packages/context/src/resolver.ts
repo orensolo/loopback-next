@@ -5,6 +5,7 @@
 
 import {DecoratorFactory} from '@loopback/metadata';
 import {Context} from './context';
+import {BindingAddress} from './binding-key';
 import {
   BoundValue,
   Constructor,
@@ -100,12 +101,15 @@ function resolve<T>(
         return injection.resolve(ctx, injection, s);
       } else {
         // Default to resolve the value from the context by binding key
-        return ctx.getValueOrPromise(injection.bindingKey, {
-          session: s,
-          // If the `optional` flag is set for the injection, the resolution
-          // will return `undefined` instead of throwing an error
-          optional: injection.metadata && injection.metadata.optional,
-        });
+        return ctx.getValueOrPromise(
+          injection.bindingSelector as BindingAddress<unknown>,
+          {
+            session: s,
+            // If the `optional` flag is set for the injection, the resolution
+            // will return `undefined` instead of throwing an error
+            optional: injection.metadata && injection.metadata.optional,
+          },
+        );
       }
     },
     injection,
@@ -174,7 +178,10 @@ export function resolveInjectedArguments(
     // The `val` argument is not used as the resolver only uses `injectedArgs`
     // and `extraArgs` to return the new value
     const injection = ix < injectedArgs.length ? injectedArgs[ix] : undefined;
-    if (injection == null || (!injection.bindingKey && !injection.resolve)) {
+    if (
+      injection == null ||
+      (!injection.bindingSelector && !injection.resolve)
+    ) {
       if (nonInjectedIndex < extraArgs.length) {
         // Set the argument from the non-injected list
         return extraArgs[nonInjectedIndex++];
@@ -265,7 +272,7 @@ export function resolveInjectedProperties(
   const injectedProperties = describeInjectedProperties(constructor.prototype);
 
   return resolveMap(injectedProperties, (injection, p) => {
-    if (!injection.bindingKey && !injection.resolve) {
+    if (!injection.bindingSelector && !injection.resolve) {
       const name = getTargetName(constructor, p);
       throw new Error(
         `Cannot resolve injected property ${name}: ` +

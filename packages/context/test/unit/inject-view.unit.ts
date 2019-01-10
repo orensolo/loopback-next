@@ -7,6 +7,7 @@ import {expect} from '@loopback/testlab';
 import {
   Binding,
   BindingScope,
+  bindingTagFilter,
   Context,
   ContextView,
   Getter,
@@ -18,20 +19,70 @@ describe('@inject.view', async () => {
   beforeEach(() => (ctx = givenContext()));
 
   class MyControllerWithGetter {
-    @inject.view(Context.bindingTagFilter('foo'), {watch: true})
+    @inject.view(bindingTagFilter('foo'), {watch: true})
     getter: Getter<string[]>;
   }
 
   class MyControllerWithValues {
     constructor(
-      @inject.view(Context.bindingTagFilter('foo'))
+      @inject.view(bindingTagFilter('foo'))
       public values: string[],
     ) {}
   }
 
   class MyControllerWithTracker {
-    @inject.view(Context.bindingTagFilter('foo'))
-    tracker: ContextView<string[]>;
+    @inject.view(bindingTagFilter('foo'))
+    view: ContextView<string[]>;
+  }
+
+  it('reports error if the target type (Getter<string[]>) is not ContextView', async () => {
+    ctx.bind('my-controller').toClass(MyControllerWithGetter);
+    await expect(
+      ctx.get<MyControllerWithGetter>('my-controller'),
+    ).to.be.rejectedWith('The target type Function is not ContextView');
+  });
+
+  it('reports error if the target type (string[]) is not ContextView', async () => {
+    ctx.bind('my-controller').toClass(MyControllerWithValues);
+    await expect(
+      ctx.get<MyControllerWithValues>('my-controller'),
+    ).to.be.rejectedWith('The target type Array is not ContextView');
+  });
+
+  it('injects as a view', async () => {
+    ctx.bind('my-controller').toClass(MyControllerWithTracker);
+    const inst = await ctx.get<MyControllerWithTracker>('my-controller');
+    expect(inst.view).to.be.instanceOf(ContextView);
+    expect(await inst.view.values()).to.eql(['BAR', 'FOO']);
+    // Add a new binding that matches the filter
+    ctx
+      .bind('xyz')
+      .to('XYZ')
+      .tag('foo');
+    // The view picks up the new binding
+    expect(await inst.view.values()).to.eql(['BAR', 'XYZ', 'FOO']);
+  });
+});
+
+describe('@inject with filter function', async () => {
+  let ctx: Context;
+  beforeEach(() => (ctx = givenContext()));
+
+  class MyControllerWithGetter {
+    @inject.getter(bindingTagFilter('foo'), {watch: true})
+    getter: Getter<string[]>;
+  }
+
+  class MyControllerWithValues {
+    constructor(
+      @inject(bindingTagFilter('foo'))
+      public values: string[],
+    ) {}
+  }
+
+  class MyControllerWithView {
+    @inject(bindingTagFilter('foo'))
+    view: ContextView<string[]>;
   }
 
   it('injects as getter', async () => {
@@ -55,18 +106,18 @@ describe('@inject.view', async () => {
     expect(inst.values).to.eql(['BAR', 'FOO']);
   });
 
-  it('injects as a tracker', async () => {
-    ctx.bind('my-controller').toClass(MyControllerWithTracker);
-    const inst = await ctx.get<MyControllerWithTracker>('my-controller');
-    expect(inst.tracker).to.be.instanceOf(ContextView);
-    expect(await inst.tracker.values()).to.eql(['BAR', 'FOO']);
+  it('injects as a view', async () => {
+    ctx.bind('my-controller').toClass(MyControllerWithView);
+    const inst = await ctx.get<MyControllerWithView>('my-controller');
+    expect(inst.view).to.be.instanceOf(ContextView);
+    expect(await inst.view.values()).to.eql(['BAR', 'FOO']);
     // Add a new binding that matches the filter
     ctx
       .bind('xyz')
       .to('XYZ')
       .tag('foo');
-    // The tracker picks up the new binding
-    expect(await inst.tracker.values()).to.eql(['BAR', 'XYZ', 'FOO']);
+    // The view picks up the new binding
+    expect(await inst.view.values()).to.eql(['BAR', 'XYZ', 'FOO']);
   });
 });
 
