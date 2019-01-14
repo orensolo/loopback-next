@@ -4,8 +4,13 @@
 // License text available at https://opensource.org/licenses/MIT
 
 import {expect} from '@loopback/testlab';
-import {Context, bind, BindingScope, Provider} from '../..';
-import {createBindingFromClass} from '../../src';
+import {
+  bind,
+  BindingScope,
+  Context,
+  createBindingFromClass,
+  Provider,
+} from '../..';
 
 describe('@bind - customize classes with binding attributes', () => {
   @bind({
