@@ -101,15 +101,13 @@ function resolve<T>(
         return injection.resolve(ctx, injection, s);
       } else {
         // Default to resolve the value from the context by binding key
-        return ctx.getValueOrPromise(
-          injection.bindingSelector as BindingAddress<unknown>,
-          {
-            session: s,
-            // If the `optional` flag is set for the injection, the resolution
-            // will return `undefined` instead of throwing an error
-            optional: injection.metadata && injection.metadata.optional,
-          },
-        );
+        const key = injection.bindingSelector as BindingAddress;
+        return ctx.getValueOrPromise(key, {
+          session: s,
+          // If the `optional` flag is set for the injection, the resolution
+          // will return `undefined` instead of throwing an error
+          optional: injection.metadata && injection.metadata.optional,
+        });
       }
     },
     injection,

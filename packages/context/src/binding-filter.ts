@@ -15,18 +15,17 @@ export type BindingFilter<ValueType = unknown> = (
 
 /**
  * Create a binding filter for the tag pattern
- * @param tagPattern
+ * @param tagPattern Binding tag name, regexp, or object
  */
-export function bindingTagFilter(tagPattern: BindingTag | RegExp) {
-  let bindingFilter: BindingFilter;
+export function filterByTag(tagPattern: BindingTag | RegExp): BindingFilter {
   if (typeof tagPattern === 'string' || tagPattern instanceof RegExp) {
     const regexp =
       typeof tagPattern === 'string'
         ? wildcardToRegExp(tagPattern)
         : tagPattern;
-    bindingFilter = b => Array.from(b.tagNames).some(t => regexp!.test(t));
+    return b => Array.from(b.tagNames).some(t => regexp!.test(t));
   } else {
-    bindingFilter = b => {
+    return b => {
       for (const t in tagPattern) {
         // One tag name/value does not match
         if (b.tagMap[t] !== tagPattern[t]) return false;
@@ -35,22 +34,24 @@ export function bindingTagFilter(tagPattern: BindingTag | RegExp) {
       return true;
     };
   }
-  return bindingFilter;
 }
 
 /**
  * Create a binding filter from key pattern
- * @param keyPattern Binding key, wildcard, or regexp
+ * @param keyPattern Binding key/wildcard, regexp, or a filter function
  */
-export function bindingKeyFilter(keyPattern?: string | RegExp) {
-  let filter: BindingFilter = binding => true;
+export function filterByKey(
+  keyPattern?: string | RegExp | BindingFilter,
+): BindingFilter {
   if (typeof keyPattern === 'string') {
     const regex = wildcardToRegExp(keyPattern);
-    filter = binding => regex.test(binding.key);
+    return binding => regex.test(binding.key);
   } else if (keyPattern instanceof RegExp) {
-    filter = binding => keyPattern.test(binding.key);
+    return binding => keyPattern.test(binding.key);
+  } else if (typeof keyPattern === 'function') {
+    return keyPattern;
   }
-  return filter;
+  return () => true;
 }
 
 /**

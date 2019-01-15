@@ -7,7 +7,7 @@ import {expect} from '@loopback/testlab';
 import {
   Binding,
   BindingScope,
-  bindingTagFilter,
+  filterByTag,
   Context,
   ContextView,
   Getter,
@@ -19,19 +19,19 @@ describe('@inject.view', async () => {
   beforeEach(() => (ctx = givenContext()));
 
   class MyControllerWithGetter {
-    @inject.view(bindingTagFilter('foo'), {watch: true})
+    @inject.view(filterByTag('foo'), {watch: true})
     getter: Getter<string[]>;
   }
 
   class MyControllerWithValues {
     constructor(
-      @inject.view(bindingTagFilter('foo'))
+      @inject.view(filterByTag('foo'))
       public values: string[],
     ) {}
   }
 
   class MyControllerWithTracker {
-    @inject.view(bindingTagFilter('foo'))
+    @inject.view(filterByTag('foo'))
     view: ContextView<string[]>;
   }
 
@@ -39,14 +39,18 @@ describe('@inject.view', async () => {
     ctx.bind('my-controller').toClass(MyControllerWithGetter);
     await expect(
       ctx.get<MyControllerWithGetter>('my-controller'),
-    ).to.be.rejectedWith('The target type Function is not ContextView');
+    ).to.be.rejectedWith(
+      'The type of MyControllerWithGetter.prototype.getter (Function) is not ContextView',
+    );
   });
 
   it('reports error if the target type (string[]) is not ContextView', async () => {
     ctx.bind('my-controller').toClass(MyControllerWithValues);
     await expect(
       ctx.get<MyControllerWithValues>('my-controller'),
-    ).to.be.rejectedWith('The target type Array is not ContextView');
+    ).to.be.rejectedWith(
+      'The type of MyControllerWithValues.constructor[0] (Array) is not ContextView',
+    );
   });
 
   it('injects as a view', async () => {
@@ -69,19 +73,19 @@ describe('@inject with filter function', async () => {
   beforeEach(() => (ctx = givenContext()));
 
   class MyControllerWithGetter {
-    @inject.getter(bindingTagFilter('foo'), {watch: true})
+    @inject.getter(filterByTag('foo'), {watch: true})
     getter: Getter<string[]>;
   }
 
   class MyControllerWithValues {
     constructor(
-      @inject(bindingTagFilter('foo'))
+      @inject(filterByTag('foo'))
       public values: string[],
     ) {}
   }
 
   class MyControllerWithView {
-    @inject(bindingTagFilter('foo'))
+    @inject(filterByTag('foo'))
     view: ContextView<string[]>;
   }
 

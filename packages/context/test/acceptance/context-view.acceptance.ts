@@ -1,7 +1,7 @@
 import {expect} from '@loopback/testlab';
 import {
   Binding,
-  bindingTagFilter,
+  filterByTag,
   Context,
   ContextEventListener,
   ContextEventType,
@@ -31,7 +31,7 @@ describe('ContextView - watches matching bindings', () => {
 
   function givenControllerWatcher() {
     server = givenServerWithinAnApp();
-    contextWatcher = server.createView(bindingTagFilter('controller'));
+    contextWatcher = server.createView(filterByTag('controller'));
     givenController(server, '1');
     givenController(server.parent!, '2');
   }
@@ -57,19 +57,19 @@ describe('@inject.* - injects a live collection of matching bindings', async () 
   beforeEach(givenPrimeNumbers);
 
   class MyControllerWithGetter {
-    @inject.getter(bindingTagFilter('prime'), {watch: true})
+    @inject.getter(filterByTag('prime'), {watch: true})
     getter: Getter<number[]>;
   }
 
   class MyControllerWithValues {
     constructor(
-      @inject(bindingTagFilter('prime'))
+      @inject(filterByTag('prime'))
       public values: number[],
     ) {}
   }
 
   class MyControllerWithView {
-    @inject.view(bindingTagFilter('prime'))
+    @inject.view(filterByTag('prime'))
     view: ContextView<number[]>;
   }
 
@@ -139,7 +139,7 @@ describe('ContextEventListener - listens on matching bindings', () => {
 
   class MyListenerForControllers implements ContextEventListener {
     controllers: Set<string> = new Set();
-    filter = bindingTagFilter('controller');
+    filter = filterByTag('controller');
     listen(event: ContextEventType, binding: Readonly<Binding<unknown>>) {
       if (event === 'bind') {
         this.controllers.add(binding.tagMap.name);

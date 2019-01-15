@@ -116,7 +116,7 @@ from bindings that match a filter function.
 
 ```ts
 class MyControllerWithGetter {
-  @inject.getter(bindingTagFilter('prime'))
+  @inject.getter(filterByTag('prime'))
   getter: Getter<number[]>;
 }
 ```
@@ -179,7 +179,7 @@ import {DataSource} from '@loopback/repository';
 
 export class DataSourceTracker {
   constructor(
-    @inject.view(bindingTagFilter('datasource'))
+    @inject.view(filterByTag('datasource'))
     private dataSources: ContextView<DataSource[]>,
   ) {}
 
@@ -190,9 +190,9 @@ export class DataSourceTracker {
 }
 ```
 
-In the example above, `bindingTagFilter` is a helper function that creates a
-filter function that matches a given tag. You can define your own filter
-functions, such as:
+In the example above, `filterByTag` is a helper function that creates a filter
+function that matches a given tag. You can define your own filter functions,
+such as:
 
 ```ts
 export class DataSourceTracker {

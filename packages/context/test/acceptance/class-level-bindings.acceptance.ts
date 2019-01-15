@@ -190,7 +190,7 @@ describe('Context bindings - Injecting dependencies of classes', () => {
 
     ctx.bind('store').toClass(Store);
     expect(() => ctx.getSync<Store>('store')).to.throw(
-      /The target type String is not a Getter function/,
+      'The type of Store.constructor[0] (String) is not a Getter function',
     );
   });
 
@@ -203,7 +203,7 @@ describe('Context bindings - Injecting dependencies of classes', () => {
 
     ctx.bind('store').toClass(Store);
     expect(() => ctx.getSync<Store>('store')).to.throw(
-      /The target type Object is not a Setter function/,
+      'The type of Store.constructor[0] (Object) is not a Setter function',
     );
   });
 

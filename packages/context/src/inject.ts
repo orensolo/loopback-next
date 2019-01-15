@@ -13,7 +13,7 @@ import {
   PropertyDecoratorFactory,
 } from '@loopback/metadata';
 import {BindingTag} from './binding';
-import {BindingFilter, bindingTagFilter} from './binding-filter';
+import {BindingFilter, filterByTag} from './binding-filter';
 import {BindingAddress} from './binding-key';
 import {Context} from './context';
 import {ContextView} from './context-view';
@@ -273,7 +273,7 @@ export namespace inject {
       {decorator: '@inject.tag', tag: bindingTag},
       metadata,
     );
-    return inject(bindingTagFilter(bindingTag), metadata);
+    return inject(filterByTag(bindingTag), metadata);
   };
 
   /**
@@ -281,7 +281,7 @@ export namespace inject {
    *
    * ```ts
    * class MyControllerWithView {
-   *   @inject.view(Context.bindingTagFilter('foo'))
+   *   @inject.view(filterByTag('foo'))
    *   view: ContextView<string[]>;
    * }
    * ```
@@ -318,8 +318,10 @@ function resolveAsGetter(
 ) {
   const targetType = inspectTargetType(injection);
   if (targetType && targetType !== Function) {
+    const targetName = ResolutionSession.describeInjection(injection)!
+      .targetName;
     throw new Error(
-      `The target type ${targetType.name} is not a Getter function`,
+      `The type of ${targetName} (${targetType.name}) is not a Getter function`,
     );
   }
   if (typeof injection.bindingSelector === 'function') {
@@ -328,7 +330,8 @@ function resolveAsGetter(
   // We need to clone the session for the getter as it will be resolved later
   session = ResolutionSession.fork(session);
   return function getter() {
-    return ctx.get(injection.bindingSelector as BindingAddress, {
+    const key = injection.bindingSelector as BindingAddress;
+    return ctx.get(key, {
       session,
       optional: injection.metadata && injection.metadata.optional,
     });
@@ -338,13 +341,16 @@ function resolveAsGetter(
 function resolveAsSetter(ctx: Context, injection: Injection) {
   const targetType = inspectTargetType(injection);
   if (targetType && targetType !== Function) {
+    const targetName = ResolutionSession.describeInjection(injection)!
+      .targetName;
     throw new Error(
-      `The target type ${targetType.name} is not a Setter function`,
+      `The type of ${targetName} (${targetType.name}) is not a Setter function`,
     );
   }
   // No resolution session should be propagated into the setter
   return function setter(value: unknown) {
-    ctx.bind(injection.bindingSelector as BindingAddress).to(value);
+    const key = injection.bindingSelector as BindingAddress;
+    ctx.bind(key).to(value);
   };
 }
 
@@ -417,7 +423,11 @@ function resolveByFilter(
   const targetType = inspectTargetType(injection);
   if (injection.metadata && injection.metadata.decorator === '@inject.view') {
     if (targetType && targetType !== ContextView) {
-      throw new Error(`The target type ${targetType.name} is not ContextView`);
+      const targetName = ResolutionSession.describeInjection(injection)!
+        .targetName;
+      throw new Error(
+        `The type of ${targetName} (${targetType.name}) is not ContextView`,
+      );
     }
   }
   const bindingFilter = injection.bindingSelector as BindingFilter;
