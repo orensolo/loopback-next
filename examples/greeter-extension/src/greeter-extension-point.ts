@@ -3,9 +3,9 @@
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
-import {inject, filterByTag, Getter} from '@loopback/context';
-import {Greeter} from './types';
+import {Getter} from '@loopback/context';
 import chalk from 'chalk';
+import {configuration, extensions, Greeter} from './types';
 
 /**
  * Options for the greeter extension point
@@ -23,16 +23,13 @@ export class GreeterExtensionPoint {
      * Inject a getter function to fetch greeters (bindings tagged with
      * 'greeter')
      */
-    @inject.getter(filterByTag({extensionPoint: 'greeter'}))
+    @extensions('greeter') // Sugar for @inject.getter(filterByTag({extensionPoint: 'greeter'}))
     private greeters: Getter<Greeter[]>,
     /**
      * An extension point should be able to receive its options via dependency
      * injection.
-     *
-     * FIXME (rfeng): A shortcut such as `@inject.config` is desired to avoid
-     * the hard-coded binding key
      */
-    @inject('greeter-extension-point.options', {optional: true})
+    @configuration() // Sugar for @inject('greeter-extension-point.options', {optional: true})
     private options?: GreeterExtensionPointOptions,
   ) {}
 
